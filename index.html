@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Spotify</title>
+    <link rel="shortcut icon" href="images/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon">
+    <link href="stylesheets/app.css" rel="stylesheet">
+  </head>
+
+  <body>
+    <div class="container">
+      <div id="login">
+        <h1>Accede a Spotify</h1>
+        <a href="/login" class="btn btn-primary">Iniciar Sesión</a>
+      </div>
+      <div id="loggedin">
+        <div id="user-profile">
+        </div>
+        <div id="oauth">
+        </div>
+        <button id="topCincuenta" class="btn btn-primary">Las canciones más populares en Chile</button></div>
+        <button class="btn btn-primary" id="obtain-new-token">Obtain new token using the refresh token</button>
+      </div>
+      <div id="busqueda-artistas">
+        <div class="container">
+          <div class="row">
+            <div class="col-md-12">
+              <div class="row">
+                <div class="col-md-6 col-md-offset-3">
+                  <h1>Las 50 canciones + escuchadas en Chile <i class="fa fa-music" aria-hidden="true"></i></h1>
+                  <hr>
+                  <div id="custom-search-input">
+                    <div class="input-group col-md-12">
+                      <input type="text" class="form-control input-md" placeholder="Buscar" onkeyup="filter(this,'theList')"/>
+                      <span class="input-group-btn">
+                        <button class="btn btn-info btn-md" type="button">
+                          <i class="glyphicon glyphicon-search"></i>
+                        </button>
+                      </span>
+                    </div>
+                  </div>
+                  <ol id="tracksUl"></ol>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="modalTrack" class="modal fade" role="dialog">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal">&times;</button>
+            <a id="song" href="" target="_blank"></a>
+            <h4 class="modal-title"></h4>
+          </div>
+          <div class="modal-body">
+            <h1 id="track"></h1>
+            <img id="cover" src="" class="img-responsive">
+            <ul class="list-inline">
+              <li>Comparte:</li>
+              <li><a id="facebook" href="" target="_blank"><i class="fa fa-facebook" aria-hidden="true"></i></a></li>
+              <li><a id="twitter" href="" target="_blank"><i class="fa fa-twitter" aria-hidden="true"></i></a></li>
+              <li><a id="googleplus" href="" target="_blank"><i class="fa fa-google-plus" aria-hidden="true"></i></a></li>
+            </ul>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" data-dismiss="modal">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script id="user-profile-template" type="text/x-handlebars-template">
+      <h1>Ingresaste como {{display_name}}</h1>
+      <div class="media">
+        <div class="pull-left">
+          <img class="media-object" width="150" src="{{images.0.url}}" />
+        </div>
+        <div class="media-body">
+          <dl class="dl-horizontal">
+            <dt>Nombre</dt><dd class="clearfix">{{display_name}}</dd>
+            <dt>Id</dt><dd>{{id}}</dd>
+            <dt>Email</dt><dd>{{email}}</dd>
+            <dt>Spotify URI</dt><dd><a href="{{external_urls.spotify}}">{{external_urls.spotify}}</a></dd>
+            <dt>Link</dt><dd><a href="{{href}}">{{href}}</a></dd>
+            <dt>Imagen de Perfil</dt><dd class="clearfix"><a href="{{images.0.url}}">{{images.0.url}}</a></dd>
+            <dt>País</dt><dd>{{country}}</dd>
+          </dl>
+        </div>
+      </div>
+    </script>
+
+    <script id="oauth-template" type="text/x-handlebars-template">
+      <h2>Información de Autentificación</h2>
+      <dl class="dl-horizontal">
+        <dt>Access token</dt><dd class="text-overflow">{{access_token}}</dd>
+        <dt>Refresh token</dt><dd class="text-overflow">{{refresh_token}}></dd>
+      </dl>
+    </script>
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/handlebars.js/2.0.0-alpha.1/handlebars.min.js"></script>
+    <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+    <script type="text/javascript" src="javascripts/bootstrap.min.js"></script>
+    <script>
+      function filter(element) {
+        var value = $(element).val();
+        value = value.toLowerCase().replace(/\b[a-z]/g, function(letter) {
+          return letter.toUpperCase();
+        });
+        $("#tracksUl > li").each(function() {
+            if ($(this).text().search(value) > -1) {
+                $(this).show();
+            }
+            else {
+                $(this).hide();
+            }
+        });
+      }
+      (function() {
+
+        function getHashParams() {
+          var hashParams = {};
+          var e, r = /([^&;=]+)=?([^&;]*)/g,
+              q = window.location.hash.substring(1);
+          while ( e = r.exec(q)) {
+             hashParams[e[1]] = decodeURIComponent(e[2]);
+          }
+          return hashParams;
+        }
+
+        var userProfileSource = document.getElementById('user-profile-template').innerHTML,
+            userProfileTemplate = Handlebars.compile(userProfileSource),
+            userProfilePlaceholder = document.getElementById('user-profile');
+
+        var oauthSource = document.getElementById('oauth-template').innerHTML,
+            oauthTemplate = Handlebars.compile(oauthSource),
+            oauthPlaceholder = document.getElementById('oauth');
+
+        var params = getHashParams();
+
+        var access_token = params.access_token,
+            refresh_token = params.refresh_token,
+            error = params.error;
+
+        if (error) {
+          alert('There was an error during the authentication');
+        } else {
+        if (access_token) {
+          oauthPlaceholder.innerHTML = oauthTemplate({
+            access_token: access_token,
+            refresh_token: refresh_token
+          });
+
+          $.ajax({
+              url: 'https://api.spotify.com/v1/me',
+              headers: {
+                'Authorization': 'Bearer ' + access_token
+              },
+              success: function(response) {
+                userProfilePlaceholder.innerHTML = userProfileTemplate(response);
+
+                $('#login').hide();
+                $('#loggedin').show();
+              }
+          });
+
+          var $button = $("form button");
+          var $artistsSelect = $("#artists");
+          var $albumsSelect = $("#albums");
+          var $tracksContainer = $("ul");
+          var $tracksUl = $("#tracksUl")
+          var $topCincuenta = $("#topCincuenta");
+
+          $topCincuenta.on("click", function(e) {
+            e.preventDefault();
+            $('#loggedin').hide();
+            $('#busqueda-artistas').show();
+            $.ajax({
+              url: "https://api.spotify.com/v1/users/spotify/playlists/37i9dQZF1DXclgCwbk0uat/tracks?offset=0&limit=50&market=CL",
+              dataType: "json",
+              headers: {
+                'Authorization': 'Bearer ' + access_token
+              },
+              success: function( response ) {
+
+                var tracks = response.items;
+                var liItems = "";
+
+                $.each( tracks, function( index, value ) {
+                  liItems += '<li><a class="link-artist" href="#" data-toggle="modal" data-target="#modalTrack" data-track="' + value.track.name + '" data-artist="' + value.track.artists[0].name + '" data-img="' + value.track.album.images[0].url + '" data-song="' + value.track.preview_url +'">'+ value.track.artists[0].name + " - " + value.track.name + '</a></li>';
+                });
+
+                $tracksUl.html(liItems)
+
+              }
+            })
+
+            $(document).on('click', '.link-artist', function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              var el = $(this);
+              $('#track').text(el.data('artist')+' - '+el.data('track'));
+              $('#cover').attr('src', el.data('img'));
+              $('#song').attr('href', el.data('song')).text(el.data('artist')+' - '+el.data('track'));
+              $('#facebook').attr('href', 'https://www.facebook.com/sharer/sharer.php?u=' + el.data('song'));
+              $('#twitter').attr('href', 'https://twitter.com/home?status=' + el.data('song'));
+              $('#googleplus').attr('href', 'https://plus.google.com/share?url=' + el.data('song'));
+            });
+
+          });
+
+        } else {
+
+            $('#login').show();
+            $('#loggedin').hide();
+        }
+
+        document.getElementById('obtain-new-token').addEventListener('click', function() {
+          $.ajax({
+            url: '/refresh_token',
+            data: {
+              'refresh_token': refresh_token
+            }
+          }).done(function(data) {
+            access_token = data.access_token;
+            oauthPlaceholder.innerHTML = oauthTemplate({
+              access_token: access_token,
+              refresh_token: refresh_token
+            });
+          });
+        }, false);
+
+
+
+
+        }
+      })();
+
+
+    </script>
+  </body>
+</html>
+
